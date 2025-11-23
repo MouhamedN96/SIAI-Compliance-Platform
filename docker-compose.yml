@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: siai_db
+    environment:
+      POSTGRES_DB: siai_compliance
+      POSTGRES_USER: siai_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siai_user -d siai_compliance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siai_network
+
+  # Agent backend (FastAPI)
+  agent_backend:
+    build:
+      context: ./apps/agent-os
+      dockerfile: Dockerfile
+    container_name: siai_agent
+    environment:
+      DATABASE_URL: postgresql://siai_user:${DB_PASSWORD:-changeme123}@postgres:5432/siai_compliance
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./packages:/app/packages
+      - ./uploads:/app/uploads
+    networks:
+      - siai_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend (Next.js) - Placeholder
+  frontend:
+    image: node:22-alpine
+    container_name: siai_frontend
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - agent_backend
+    networks:
+      - siai_network
+    command: echo "Frontend placeholder - implement with Next.js"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  siai_network:
+    driver: bridge
