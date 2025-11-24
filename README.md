@@ -1,213 +1,257 @@
 # SIAI Compliance Platform
 
-SIAI (Secure Intelligence & Audit Interface) is a self-hosted platform for analyzing documents for compliance and legal risks. It uses a multi-agent system to review text against established frameworks such as GDPR and SOC 2, identify potential issues, and provide actionable recommendations. The system is designed to be privacy-first, ensuring that all documents and analysis remain within the user's infrastructure.
+Privacy-first document compliance analysis platform with conversational AI interface.
 
----
+## Overview
 
-## Table of Contents
+SIAI analyzes documents for compliance violations (GDPR, SOC2, contract risks) and provides actionable remediation advice through a conversational interface. The platform learns from user feedback to improve accuracy over time.
 
-- [Core Features](#core-features)
-- [System Architecture](#system-architecture)
-- [Technology Stack](#technology-stack)
-- [Local Development Setup](#local-development-setup)
-- [API Usage](#api-usage)
-- [Agent Learning Mechanism](#agent-learning-mechanism)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+### Key Features
 
----
+- **Document Analysis**: Upload PDFs/DOCX and get instant compliance analysis
+- **Conversational Interface**: Chat with the compliance agent about findings
+- **Real-time Updates**: WebSocket-powered live analysis progress
+- **Memory-Powered Learning**: Agent improves accuracy based on feedback
+- **Tool Integrations**: Send findings to Slack, create Jira tickets via Composio
+- **Privacy-First**: Self-hosted, all data stays in your infrastructure
 
-## Core Features
+## Architecture
 
-- **Multi-Framework Analysis**: Analyzes documents against multiple compliance and risk frameworks, including GDPR, SOC 2, and general contract risks. The system is extensible to support other frameworks like HIPAA or ISO 27001.
-- **Risk Identification and Scoring**: Identifies compliance gaps, legal risks, and financial exposures. Each finding is assigned a severity level (Critical, High, Medium, Low) and contributes to an overall document risk score.
-- **Actionable Recommendations**: Provides specific, actionable recommendations for each finding to guide remediation efforts.
-- **Memory-Powered Learning**: Employs a dual-memory system to learn from user feedback, improving accuracy and reducing false positives over time.
-- **Privacy-First Architecture**: All components, including the database and agents, are designed to be self-hosted, ensuring that sensitive documents are never transmitted to third-party services.
-- **Model Agnosticism**: Compatible with any OpenAI-compatible LLM API, allowing users to choose between high-performance cloud models or private, self-hosted models.
-
----
-
-## System Architecture
-
-The platform consists of a FastAPI backend and a PostgreSQL database. The backend houses the core agentic system responsible for document analysis.
-
-```mermaid
-graph TD
-    A[User via API/UI] -->|Upload Document| B(FastAPI Backend);
-    B --> C{Document Analyst Agent};
-    C --> D[GDPR Agent];
-    C --> E[SOC 2 Agent];
-    C --> F[Contract Risk Agent];
-    C --> G[Memory System];
-    G --> H[PostgreSQL Database];
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│   Next.js UI    │────────▶│   FastAPI Agent  │────────▶│   PostgreSQL    │
+│  (Split-screen) │◀────────│   (WebSocket)    │◀────────│   + pgvector    │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+        │                            │
+        │                            ▼
+        │                    ┌──────────────────┐
+        └───────────────────▶│   Composio API   │
+                             │  (Slack, Jira,   │
+                             │   Notion, etc.)  │
+                             └──────────────────┘
 ```
 
-1.  **FastAPI Backend**: Provides a REST API for document upload, analysis, and retrieval of findings.
-2.  **Document Analyst Agent**: The primary agent that orchestrates the analysis workflow using a `perceive -> plan -> act -> reflect` loop.
-3.  **Specialized Agents**: Each agent (`GDPRComplianceAgent`, `SOC2ComplianceAgent`, etc.) is an expert in a specific compliance framework.
-4.  **Memory System**: Manages the storage and retrieval of compliance findings (episodic memory) and learned risk patterns (semantic memory).
-5.  **PostgreSQL Database**: Stores documents, analysis results, and the agent's memory.
+### Components
 
----
+- **Frontend**: Next.js 16 + React 19 + Tailwind CSS
+- **Backend**: FastAPI + WebSocket support
+- **Database**: PostgreSQL with pgvector for semantic search
+- **AI**: OpenAI/Anthropic/Local LLMs (via LiteLLM)
+- **Integrations**: Composio for 200+ tool connections
 
-## Technology Stack
-
-| Component | Technology |
-| :--- | :--- |
-| **Backend** | FastAPI, Python 3.11 |
-| **Database** | PostgreSQL 16, pgvector |
-| **Agents** | Custom Python classes |
-| **Deployment** | Docker, Docker Compose |
-| **Document Parsing**| `python-multipart` (Text), `PyPDF2`/`python-docx` (Binary) |
-
----
-
-## Local Development Setup
+## Quick Start
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- An API key for an OpenAI-compatible LLM provider
+- OpenAI API key (or local LLM)
+- (Optional) Composio API key for integrations
 
-### 1. Configuration
+### Installation
 
-Clone the repository and create a `.env` file from the example:
-
+1. Clone the repository:
 ```bash
 git clone https://github.com/MouhamedN96/SIAI-Compliance-Platform.git
 cd SIAI-Compliance-Platform
+```
 
+2. Configure environment:
+```bash
 cp .env.example .env
+# Edit .env and add your API keys
 ```
 
-Open the `.env` file and add your database password and LLM API key:
-
-```env
-DB_PASSWORD=your_secure_password
-OPENAI_API_KEY=sk-your-openai-key
-LLM_MODEL=gpt-4o
-```
-
-### 2. Start Services
-
-Run the following command to build and start all services:
-
+3. Start services:
 ```bash
 docker-compose up -d
 ```
 
-This will provision:
-- A PostgreSQL database on port `5432`.
-- The FastAPI backend on port `8000`.
+4. Access the platform:
+- Frontend: http://localhost:3000
+- API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-### 3. Verify Setup
+## Usage
 
-- **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+### Document Analysis
 
----
+1. Open the platform at http://localhost:3000
+2. Drag and drop a PDF document
+3. Watch real-time analysis in the conversation panel
+4. Click on findings to see details in the document viewer
+5. Ask follow-up questions about compliance issues
 
-## API Usage
+### Chat Examples
 
-### Upload and Analyze a Document
+- "What are the high-severity GDPR violations?"
+- "How do I fix the data retention issue?"
+- "Send a summary of findings to Slack"
+- "Create a Jira ticket for the SOC2 violations"
 
-Send a `POST` request to `/api/documents/upload` with a file to trigger analysis.
+### Tool Integrations (Composio)
 
-**Request:**
-```bash
-curl -X POST http://localhost:8000/api/documents/upload \
-  -F "file=@./privacy_policy.txt" \
-  -F "document_type=policy" \
-  -F "frameworks=gdpr,soc2"
-```
-
-**Response:**
-The API returns a JSON object containing the analysis results, including a list of findings, a risk score, and an executive summary.
-
-### Retrieve Findings for a Document
-
-Fetch all findings associated with a specific document ID.
+Enable Composio by adding your API key to `.env`:
 
 ```bash
-curl http://localhost:8000/api/documents/{document_id}/findings
+COMPOSIO_API_KEY=your-key-here
 ```
 
-### Submit Feedback on a Finding
-
-Submit feedback to help the agent learn. This is a critical part of the `reflect` step in the agent loop.
-
-```bash
-curl -X POST http://localhost:8000/api/findings/{finding_id}/feedback \
-  -H "Content-Type: application/json" \
-  -d 
-    "finding_id": "finding_123",
-    "feedback": "accepted"
-  }
-```
-
----
-
-## Agent Learning Mechanism
-
-The agent's learning capability is based on a dual-memory architecture:
-
-1.  **Episodic Memory**: Stores every compliance finding as a discrete event in the `compliance_findings` table. This includes the finding itself, the document context, and any user feedback (`accepted`, `rejected`, `false_positive`).
-
-2.  **Semantic Memory**: Stores generalized risk patterns in the `risk_patterns` table. These patterns are derived by aggregating feedback from episodic memory. For example, if a certain type of clause is repeatedly flagged and accepted by users as a risk, the system learns this as a high-precision pattern.
-
-This feedback loop allows the system to adapt to the specific risk tolerance and document types of an organization, improving its accuracy over time.
-
----
+Available integrations:
+- Slack: Send compliance summaries
+- Jira: Create tickets for violations
+- Notion: Save analysis reports
+- Gmail: Email findings to stakeholders
+- GitHub: Track remediation in issues
 
 ## Configuration
 
 ### LLM Models
 
-The platform is model-agnostic. The LLM can be configured in the `.env` file. For compliance documents, models with large context windows are recommended.
+The platform supports multiple LLM providers. Edit `.env`:
 
-```env
-# Anthropic Claude 3.5 Sonnet (recommended for long documents)
-# LLM_MODEL=anthropic/claude-3-5-sonnet-20240620
-
-# OpenAI GPT-4o
+```bash
+# OpenAI (default)
 LLM_MODEL=gpt-4o
+OPENAI_API_KEY=sk-...
 
-# Self-hosted via Ollama
-# LLM_MODEL=ollama/llama3
+# Anthropic (best for long documents)
+LLM_MODEL=anthropic/claude-3-5-sonnet-20240620
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Local (privacy-first)
+LLM_MODEL=ollama/llama3
+# No API key needed, point to local Ollama instance
 ```
 
 ### Compliance Frameworks
 
-New frameworks can be added by creating a new agent class in `packages/agents/compliance_agents.py` and registering it in the `DocumentAnalystAgent`.
+Supported frameworks (can be extended):
+- GDPR (General Data Protection Regulation)
+- SOC2 (System and Organization Controls 2)
+- Contract Risk Analysis
+- Custom frameworks (add to `agents/compliance_agents.py`)
 
----
+## Development
+
+### Project Structure
+
+```
+siai-compliance-platform/
+├── apps/
+│   ├── frontend/          # Next.js application
+│   │   ├── app/           # Pages and routes
+│   │   └── components/    # React components
+│   └── agent-os/          # FastAPI backend
+│       ├── main.py        # API server
+│       └── requirements.txt
+├── packages/
+│   ├── database/          # Database schemas
+│   ├── memory/            # Episodic/semantic memory
+│   └── agents/            # Compliance agents
+├── docker-compose.yml
+└── README.md
+```
+
+### Running Locally (without Docker)
+
+**Backend:**
+```bash
+cd apps/agent-os
+pip install -r requirements.txt
+python main.py
+```
+
+**Frontend:**
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
+
+**Database:**
+```bash
+# Install PostgreSQL with pgvector extension
+# Run schema: psql < packages/database/schema.sql
+```
+
+## API Reference
+
+### Document Analysis
+
+```bash
+POST /api/documents/analyze-stream
+Content-Type: application/json
+
+{
+  "document_id": "uuid",
+  "document_text": "...",
+  "filename": "contract.pdf",
+  "frameworks": ["gdpr", "soc2"],
+  "session_id": "websocket-session-id"
+}
+```
+
+### Chat
+
+```bash
+POST /api/chat
+Content-Type: application/json
+
+{
+  "session_id": "uuid",
+  "message": "What are the GDPR violations?",
+  "document_id": "uuid"
+}
+```
+
+### WebSocket
+
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/session-id');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  switch(data.type) {
+    case 'analysis_started':
+      console.log('Analysis started');
+      break;
+    case 'finding_discovered':
+      console.log('New finding:', data.finding);
+      break;
+    case 'analysis_complete':
+      console.log('Analysis complete');
+      break;
+  }
+};
+```
 
 ## Deployment
 
-For a production environment, it is recommended to:
+### Production Checklist
 
-1.  Use a managed database service (e.g., AWS RDS, Google Cloud SQL).
-2.  Deploy the backend service as a container (e.g., on AWS ECS, Google Cloud Run, or Kubernetes).
-3.  Implement a robust authentication layer.
-4.  Configure monitoring and logging.
+- [ ] Change database password in `.env`
+- [ ] Restrict CORS origins in `main.py`
+- [ ] Enable HTTPS (use Caddy or nginx)
+- [ ] Set up database backups
+- [ ] Configure log aggregation
+- [ ] Add authentication (Clerk/Auth0)
+- [ ] Set up monitoring (Sentry)
 
----
+### Scaling
 
-## Contributing
-
-Contributions are welcome. Please follow the standard fork-and-pull-request workflow.
-
-1.  Fork the repository.
-2.  Create a new branch (`git checkout -b feature/your-feature`).
-3.  Commit your changes (`git commit -am 'Add new feature'`).
-4.  Push to the branch (`git push origin feature/your-feature`).
-5.  Create a new Pull Request.
-
----
+For high-volume deployments:
+- Use managed PostgreSQL (AWS RDS, Supabase)
+- Deploy backend with Kubernetes
+- Add Redis for session management
+- Use CDN for frontend (Vercel, Cloudflare)
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file for details.
+
+## Support
+
+- GitHub Issues: https://github.com/MouhamedN96/SIAI-Compliance-Platform/issues
+- Documentation: https://github.com/MouhamedN96/SIAI-Compliance-Platform/wiki
+
